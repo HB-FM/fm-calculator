@@ -54,7 +54,7 @@ if 'model' not in st.session_state:
     st.session_state.calculated = False
 
 # Sidebar navigation
-st.sidebar.title("🌾 FarmMate")
+st.sidebar.title("🚜 Farm Budget Builder")
 st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
