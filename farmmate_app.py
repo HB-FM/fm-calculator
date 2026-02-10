@@ -1,5 +1,5 @@
 """
-FarmMate - Farm Budgeting Web Application
+Farm Budgeting Web Application
 Streamlit interface for farm financial planning
 """
 
@@ -16,8 +16,8 @@ from farmmate_engine import (
 
 # Page config
 st.set_page_config(
-    page_title="FarmMate - Farm Budgeting Tool",
-    page_icon="🌾",
+    page_title="Farm Budget Builder",
+    page_icon="🚜",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -59,7 +59,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigate",
-    ["📊 Dashboard", "⚙️ Setup", "🌾 Land & Assets", "🌱 Cropping", "🐄 Livestock", "💰 Financials", "📈 Reports"]
+    ["📊 Dashboard", "⚙️ Setup", "🌍🚜 Land & Assets", "🌱 Cropping", "🐄🐑 Livestock", "💰 Financials", "📈 Reports"]
 )
 
 st.sidebar.markdown("---")
