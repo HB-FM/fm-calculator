@@ -59,7 +59,7 @@ st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigate",
-    ["📊 Dashboard", "⚙️ Setup", "🌍🚜 Land & Assets", "🌱 Cropping", "🐄🐑 Livestock", "💰 Financials", "📈 Reports"]
+    ["📊 Dashboard", "⚙️ Setup", "🚜 Land & Assets", "🌱 Cropping", "🐄🐑 Livestock", "💰 Financials", "📈 Reports"]
 )
 
 st.sidebar.markdown("---")
