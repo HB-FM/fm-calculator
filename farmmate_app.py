@@ -17,8 +17,8 @@ from farmmate_engine import (
 
 # Page config
 st.set_page_config(
-    page_title="FarmMate - Farm Budgeting Tool",
-    page_icon="🌾",
+    page_title="Farm Budgeting Tool",
+    page_icon="🚜",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -148,7 +148,7 @@ if 'model' not in st.session_state:
     st.session_state.calculated = False
 
 # Sidebar navigation
-st.sidebar.title("🌾 FarmMate")
+st.sidebar.title("🚜 Farm Budget")
 st.sidebar.markdown("---")
 
 PAGES = {
