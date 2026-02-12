@@ -8,10 +8,11 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
+import json
 from farmmate_engine import (
-    FarmModel, GeneralAssumptions, InflationRates, CropMargin,
+    FarmModel, GeneralAssumptions, InflationRates, CropMargin, CropProgram,
     LivestockProgram, LivestockClass, OverheadCategory, OpeningBalances,
-    Paddock, FixedAsset, PlannedCapex, PlannedDisposal
+    Paddock, FixedAsset, PlannedCapex, PlannedDisposal, WoolProduction, PastureProgram
 )
 
 # Page config
@@ -48,6 +49,99 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Helper functions for save/load
+def model_to_dict(model):
+    """Convert FarmModel to dictionary for JSON serialization"""
+    data = {
+        'general': {
+            'farm_name': model.general.farm_name,
+            'start_date': model.general.start_date.isoformat(),
+            'num_months': model.general.num_months,
+            'income_tax_rate': model.general.income_tax_rate,
+            'gst_rate': model.general.gst_rate,
+            'overdraft_rate': model.general.overdraft_rate,
+        },
+        'opening_balances': {
+            'cash': model.opening_balances.cash,
+            'trade_debtors': model.opening_balances.trade_debtors,
+            'inventory_grain': model.opening_balances.inventory_grain,
+            'inventory_wool': model.opening_balances.inventory_wool,
+            'inventory_livestock': model.opening_balances.inventory_livestock,
+            'fixed_assets': model.opening_balances.fixed_assets,
+            'land_water': model.opening_balances.land_water,
+            'trade_creditors': model.opening_balances.trade_creditors,
+            'debt_facilities': model.opening_balances.debt_facilities,
+            'share_capital': model.opening_balances.share_capital,
+            'retained_earnings': model.opening_balances.retained_earnings,
+        },
+        'paddocks': [{'name': p.name, 'property': p.property, 'size_ha': p.size_ha, 
+                      'can_rotate': p.can_rotate} for p in model.paddocks],
+        'fixed_assets': [{'name': a.name, 'asset_class': a.asset_class, 'asset_subclass': a.asset_subclass,
+                          'purchase_date': a.purchase_date.isoformat(), 'purchase_amount': a.purchase_amount,
+                          'useful_life_years': a.useful_life_years, 'residual_value': a.residual_value}
+                         for a in model.fixed_assets],
+        'planned_capex': [{'asset_name': c.asset_name, 'asset_class': c.asset_class, 
+                           'purchase_month': c.purchase_month, 'purchase_amount': c.purchase_amount,
+                           'useful_life_years': c.useful_life_years} for c in model.planned_capex],
+        'crop_margins': [{'crop_name': c.crop_name, 'area_ha': c.area_ha, 'yield_per_ha': c.yield_per_ha,
+                          'price_per_unit': c.price_per_unit, 'harvest_month': c.harvest_month,
+                          'sale_month': c.sale_month} for c in model.crop_margins],
+        'livestock_classes': [{'class_name': lc.class_name, 'avg_weight_kg': lc.avg_weight_kg,
+                               'price_per_kg': lc.price_per_kg, 'dse': lc.dse} 
+                              for lc in model.livestock_classes],
+        'overheads': [{'category': o.category, 'allocation_method': o.allocation_method}
+                     for o in model.overheads],
+    }
+    return data
+
+def dict_to_model(data):
+    """Convert dictionary to FarmModel"""
+    model = FarmModel()
+    
+    # General settings
+    model.general.farm_name = data['general']['farm_name']
+    model.general.start_date = datetime.fromisoformat(data['general']['start_date'])
+    model.general.num_months = data['general']['num_months']
+    model.general.income_tax_rate = data['general']['income_tax_rate']
+    model.general.gst_rate = data['general']['gst_rate']
+    model.general.overdraft_rate = data['general']['overdraft_rate']
+    
+    # Opening balances
+    ob = data['opening_balances']
+    model.opening_balances = OpeningBalances(
+        cash=ob['cash'], trade_debtors=ob['trade_debtors'],
+        inventory_grain=ob['inventory_grain'], inventory_wool=ob['inventory_wool'],
+        inventory_livestock=ob['inventory_livestock'], fixed_assets=ob['fixed_assets'],
+        land_water=ob['land_water'], trade_creditors=ob['trade_creditors'],
+        debt_facilities=ob['debt_facilities'], share_capital=ob['share_capital'],
+        retained_earnings=ob['retained_earnings']
+    )
+    
+    # Paddocks
+    model.paddocks = [Paddock(**p) for p in data.get('paddocks', [])]
+    
+    # Fixed assets
+    model.fixed_assets = [FixedAsset(
+        name=a['name'], asset_class=a['asset_class'], asset_subclass=a['asset_subclass'],
+        purchase_date=datetime.fromisoformat(a['purchase_date']),
+        purchase_amount=a['purchase_amount'], useful_life_years=a['useful_life_years'],
+        residual_value=a['residual_value']
+    ) for a in data.get('fixed_assets', [])]
+    
+    # Planned CAPEX
+    model.planned_capex = [PlannedCapex(**c) for c in data.get('planned_capex', [])]
+    
+    # Crop margins
+    model.crop_margins = [CropMargin(**c) for c in data.get('crop_margins', [])]
+    
+    # Livestock classes
+    model.livestock_classes = [LivestockClass(**lc) for lc in data.get('livestock_classes', [])]
+    
+    # Overheads
+    model.overheads = [OverheadCategory(**o) for o in data.get('overheads', [])]
+    
+    return model
+
 # Initialize session state
 if 'model' not in st.session_state:
     st.session_state.model = FarmModel()
@@ -70,11 +164,40 @@ if st.sidebar.button("🔄 Recalculate", use_container_width=True):
         st.session_state.calculated = True
         st.success("Calculation complete!")
 
-if st.sidebar.button("💾 Save Scenario", use_container_width=True):
-    st.info("Save functionality coming soon")
+# Save/Load functionality
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 💾 Save & Load")
 
-if st.sidebar.button("📥 Export Report", use_container_width=True):
-    st.info("Export functionality coming soon")
+# Save scenario
+save_name = st.sidebar.text_input("Scenario name", value=st.session_state.model.general.farm_name or "My Farm")
+if st.sidebar.button("💾 Save Scenario", use_container_width=True):
+    try:
+        data = model_to_dict(st.session_state.model)
+        json_str = json.dumps(data, indent=2)
+        
+        # Offer download
+        st.sidebar.download_button(
+            label="📥 Download Scenario File",
+            data=json_str,
+            file_name=f"{save_name.replace(' ', '_')}_scenario.json",
+            mime="application/json",
+            use_container_width=True
+        )
+        st.sidebar.success(f"Scenario '{save_name}' ready to download!")
+    except Exception as e:
+        st.sidebar.error(f"Save failed: {str(e)}")
+
+# Load scenario
+uploaded_file = st.sidebar.file_uploader("📂 Load Scenario", type=['json'])
+if uploaded_file is not None:
+    try:
+        data = json.loads(uploaded_file.read())
+        st.session_state.model = dict_to_model(data)
+        st.session_state.calculated = False
+        st.sidebar.success(f"Loaded scenario: {data['general']['farm_name']}")
+        st.rerun()
+    except Exception as e:
+        st.sidebar.error(f"Load failed: {str(e)}")
 
 # Main content area
 if page == "📊 Dashboard":
@@ -228,8 +351,13 @@ elif page == "⚙️ Setup":
                                                   st.session_state.model.opening_balances.inventory_wool +
                                                   st.session_state.model.opening_balances.inventory_livestock),
                                        min_value=0.0, format="%.2f")
-            fixed_assets = st.number_input("Fixed Assets ($)", value=float(st.session_state.model.opening_balances.fixed_assets),
-                                          min_value=0.0, format="%.2f")
+            
+            # Calculate fixed assets from FAR
+            far_total = sum(asset.purchase_amount for asset in st.session_state.model.fixed_assets)
+            st.markdown(f"**Fixed Assets ($)** - Auto-calculated from FAR")
+            st.metric("Fixed Assets", f"${far_total:,.2f}")
+            st.caption("⚠️ This value is calculated from your Fixed Asset Register. Add/edit assets in the 'Land & Assets' page.")
+            
             land = st.number_input("Land & Water ($)", value=float(st.session_state.model.opening_balances.land_water),
                                   min_value=0.0, format="%.2f")
         
@@ -248,7 +376,7 @@ elif page == "⚙️ Setup":
         st.session_state.model.opening_balances.cash = cash
         st.session_state.model.opening_balances.trade_debtors = debtors
         st.session_state.model.opening_balances.inventory_grain = inventory  # Simplified
-        st.session_state.model.opening_balances.fixed_assets = fixed_assets
+        st.session_state.model.opening_balances.fixed_assets = far_total  # Auto-calculated
         st.session_state.model.opening_balances.land_water = land
         st.session_state.model.opening_balances.trade_creditors = creditors
         st.session_state.model.opening_balances.debt_facilities = debt
@@ -283,39 +411,50 @@ elif page == "🌾 Land & Assets":
         
         # Add paddock
         with st.expander("➕ Add Paddock"):
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
                 pad_name = st.text_input("Paddock Name", key="pad_name")
             with col2:
                 pad_property = st.text_input("Property", key="pad_property")
             with col3:
                 pad_size = st.number_input("Size (ha)", min_value=0.0, key="pad_size")
+            with col4:
+                pad_rotate = st.checkbox("Can Rotate?", value=True, key="pad_rotate")
             
             if st.button("Add Paddock"):
                 new_pad = Paddock(
                     name=pad_name,
-                    property_name=pad_property,
-                    size_ha=pad_size
+                    property=pad_property,
+                    size_ha=pad_size,
+                    can_rotate=pad_rotate
                 )
                 st.session_state.model.paddocks.append(new_pad)
                 st.success(f"Added {pad_name}")
                 st.rerun()
         
-        # Display paddocks
+        # Display paddocks with edit/delete
         if st.session_state.model.paddocks:
             st.markdown("### Paddock List")
-            pads_data = []
-            for pad in st.session_state.model.paddocks:
-                pads_data.append({
-                    'Paddock': pad.name,
-                    'Property': pad.property_name,
-                    'Size (ha)': pad.size_ha
-                })
+            total_area = 0
             
-            df_pads = pd.DataFrame(pads_data)
-            st.dataframe(df_pads, use_container_width=True)
+            for idx, pad in enumerate(st.session_state.model.paddocks):
+                total_area += pad.size_ha
+                
+                col1, col2, col3 = st.columns([6, 1, 1])
+                with col1:
+                    st.markdown(f"**{pad.name}** - {pad.property}")
+                    st.caption(f"Size: {pad.size_ha:,.1f} ha | Rotation: {'Yes' if pad.can_rotate else 'No'}")
+                with col2:
+                    if st.button("✏️", key=f"edit_pad_{idx}"):
+                        st.session_state[f'editing_pad_{idx}'] = True
+                with col3:
+                    if st.button("🗑️", key=f"delete_pad_{idx}"):
+                        st.session_state.model.paddocks.pop(idx)
+                        st.success(f"Deleted {pad.name}")
+                        st.rerun()
+                
+                st.markdown("---")
             
-            total_area = df_pads['Size (ha)'].sum()
             st.metric("Total Farm Area", f"{total_area:,.1f} ha")
         else:
             st.info("Add paddocks to start planning your farm layout")
@@ -329,7 +468,7 @@ elif page == "🌾 Land & Assets":
             with col1:
                 asset_name = st.text_input("Asset Name", key="asset_name")
                 asset_class = st.selectbox("Asset Class", 
-                    ["Buildings", "Irrigation", "Plant & Equipment", "Motor Vehicles", "Pasture"],
+                    ["Buildings", "Irrigation", "Machinery", "Plant & Equipment", "Motor Vehicles", "Pasture"],
                     key="asset_class")
                 asset_subclass = st.text_input("Subclass", key="asset_subclass")
                 purchase_date = st.date_input("Purchase Date", key="asset_purchase_date")
@@ -341,7 +480,7 @@ elif page == "🌾 Land & Assets":
             
             if st.button("Add Asset"):
                 new_asset = FixedAsset(
-                    asset_name=asset_name,
+                    name=asset_name,
                     asset_class=asset_class,
                     asset_subclass=asset_subclass,
                     purchase_date=datetime.combine(purchase_date, datetime.min.time()),
@@ -353,32 +492,75 @@ elif page == "🌾 Land & Assets":
                 st.success(f"Added {asset_name}")
                 st.rerun()
         
-        # Display assets
+        # Display assets with edit/delete
         if st.session_state.model.fixed_assets:
             st.markdown("### Asset Register")
             assets_data = []
             total_cost = 0
             total_annual_dep = 0
             
-            for asset in st.session_state.model.fixed_assets:
+            for idx, asset in enumerate(st.session_state.model.fixed_assets):
                 annual_dep = asset.calculate_annual_depreciation()
                 total_cost += asset.purchase_amount
                 total_annual_dep += annual_dep
                 
-                assets_data.append({
-                    'Asset': asset.asset_name,
-                    'Class': asset.asset_class,
-                    'Subclass': asset.asset_subclass,
-                    'Purchase Cost': f"${asset.purchase_amount:,.0f}",
-                    'Useful Life (yrs)': asset.useful_life_years,
-                    'Annual Depreciation': f"${annual_dep:,.0f}"
-                })
+                col1, col2, col3 = st.columns([6, 1, 1])
+                with col1:
+                    st.markdown(f"**{asset.name}** - {asset.asset_class} / {asset.asset_subclass}")
+                    st.caption(f"Cost: ${asset.purchase_amount:,.0f} | Life: {asset.useful_life_years} yrs | Annual Dep: ${annual_dep:,.0f}")
+                with col2:
+                    if st.button("✏️", key=f"edit_asset_{idx}"):
+                        st.session_state[f'editing_asset_{idx}'] = True
+                with col3:
+                    if st.button("🗑️", key=f"delete_asset_{idx}"):
+                        st.session_state.model.fixed_assets.pop(idx)
+                        st.success(f"Deleted {asset.name}")
+                        st.rerun()
+                
+                # Edit mode
+                if st.session_state.get(f'editing_asset_{idx}', False):
+                    with st.form(f"edit_asset_form_{idx}"):
+                        st.markdown("#### Edit Asset")
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            new_name = st.text_input("Name", value=asset.name)
+                            new_class = st.selectbox("Class", 
+                                ["Buildings", "Irrigation", "Machinery", "Plant & Equipment", "Motor Vehicles", "Pasture"],
+                                index=["Buildings", "Irrigation", "Machinery", "Plant & Equipment", "Motor Vehicles", "Pasture"].index(asset.asset_class))
+                            new_subclass = st.text_input("Subclass", value=asset.asset_subclass)
+                        with col2:
+                            new_amount = st.number_input("Amount ($)", value=float(asset.purchase_amount), min_value=0.0)
+                            new_life = st.number_input("Life (years)", value=float(asset.useful_life_years), min_value=1.0)
+                            new_residual = st.number_input("Residual ($)", value=float(asset.residual_value), min_value=0.0)
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.form_submit_button("💾 Save"):
+                                asset.name = new_name
+                                asset.asset_class = new_class
+                                asset.asset_subclass = new_subclass
+                                asset.purchase_amount = new_amount
+                                asset.useful_life_years = new_life
+                                asset.residual_value = new_residual
+                                st.session_state[f'editing_asset_{idx}'] = False
+                                st.rerun()
+                        with col2:
+                            if st.form_submit_button("❌ Cancel"):
+                                st.session_state[f'editing_asset_{idx}'] = False
+                                st.rerun()
+                
+                st.markdown("---")
             
-            df_assets = pd.DataFrame(assets_data)
-            st.dataframe(df_assets, use_container_width=True)
-            
-            col1, col2 = st.columns(2)
+            # Summary metrics
+            st.markdown("### Summary")
+            col1, col2, col3 = st.columns(3)
             with col1:
+                st.metric("Total Cost", f"${total_cost:,.0f}")
+            with col2:
+                st.metric("Annual Depreciation", f"${total_annual_dep:,.0f}")
+            with col3:
+                avg_life = sum(a.useful_life_years for a in st.session_state.model.fixed_assets) / len(st.session_state.model.fixed_assets)
+                st.metric("Avg Useful Life", f"{avg_life:.1f} years")
                 st.metric("Total Asset Cost", f"${total_cost:,.0f}")
             with col2:
                 st.metric("Total Annual Depreciation", f"${total_annual_dep:,.0f}")
@@ -394,10 +576,22 @@ elif page == "🌾 Land & Assets":
             with col1:
                 capex_name = st.text_input("Asset Name", key="capex_name")
                 capex_class = st.selectbox("Asset Class",
-                    ["Buildings", "Irrigation", "Plant & Equipment", "Motor Vehicles", "Pasture"],
+                    ["Buildings", "Irrigation", "Machinery", "Plant & Equipment", "Motor Vehicles", "Pasture"],
                     key="capex_class")
                 capex_subclass = st.text_input("Subclass", key="capex_subclass")
-                capex_month = st.number_input("Purchase Month", min_value=1, max_value=12, key="capex_month")
+                
+                # Date picker instead of month number
+                farm_start = st.session_state.model.general.start_date
+                capex_date = st.date_input("Purchase Date", 
+                                          min_value=farm_start,
+                                          value=farm_start,
+                                          key="capex_date")
+                
+                # Calculate month number from date
+                months_diff = (capex_date.year - farm_start.year) * 12 + (capex_date.month - farm_start.month)
+                capex_month = months_diff + 1  # 1-indexed
+                st.caption(f"This is month {capex_month} of your budget")
+                
             with col2:
                 capex_amt = st.number_input("Purchase Amount ($)", min_value=0.0, key="capex_amt")
                 capex_life = st.number_input("Useful Life (years)", min_value=1.0, max_value=100.0,
@@ -418,24 +612,34 @@ elif page == "🌾 Land & Assets":
                 st.success(f"Added CAPEX: {capex_name}")
                 st.rerun()
         
-        # Display planned CAPEX
+        # Display planned CAPEX with edit/delete
         if st.session_state.model.planned_capex:
             st.markdown("### Planned Capital Expenditure")
-            capex_data = []
             total_capex = 0
             
-            for capex in st.session_state.model.planned_capex:
+            for idx, capex in enumerate(st.session_state.model.planned_capex):
                 total_capex += capex.purchase_amount
-                capex_data.append({
-                    'Asset': capex.asset_name,
-                    'Class': capex.asset_class,
-                    'Purchase Month': capex.purchase_month,
-                    'Amount': f"${capex.purchase_amount:,.0f}",
-                    'Useful Life': f"{capex.useful_life_years:.0f} yrs"
-                })
-            
-            df_capex = pd.DataFrame(capex_data)
-            st.dataframe(df_capex, use_container_width=True)
+                
+                # Calculate date from month
+                farm_start = st.session_state.model.general.start_date
+                purchase_date = farm_start.replace(month=((farm_start.month + capex.purchase_month - 2) % 12) + 1)
+                if capex.purchase_month > 12:
+                    purchase_date = purchase_date.replace(year=farm_start.year + (capex.purchase_month - 1) // 12)
+                
+                col1, col2, col3 = st.columns([6, 1, 1])
+                with col1:
+                    st.markdown(f"**{capex.asset_name}** - {capex.asset_class}")
+                    st.caption(f"Amount: ${capex.purchase_amount:,.0f} | Date: {purchase_date.strftime('%b %Y')} (Month {capex.purchase_month}) | Life: {capex.useful_life_years} yrs")
+                with col2:
+                    if st.button("✏️", key=f"edit_capex_{idx}"):
+                        st.session_state[f'editing_capex_{idx}'] = True
+                with col3:
+                    if st.button("🗑️", key=f"delete_capex_{idx}"):
+                        st.session_state.model.planned_capex.pop(idx)
+                        st.success(f"Deleted CAPEX: {capex.asset_name}")
+                        st.rerun()
+                
+                st.markdown("---")
             
             st.metric("Total Planned CAPEX", f"${total_capex:,.0f}")
         else:
