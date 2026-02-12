@@ -1,5 +1,5 @@
 """
-Farm Budgeting Web Application
+FarmMate - Farm Budgeting Web Application
 Streamlit interface for farm financial planning
 """
 
@@ -17,8 +17,8 @@ from farmmate_engine import (
 
 # Page config
 st.set_page_config(
-    page_title="Farm Budget Builder",
-    page_icon="🚜",
+    page_title="FarmMate - Farm Budgeting Tool",
+    page_icon="🌾",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -74,8 +74,8 @@ def model_to_dict(model):
             'share_capital': model.opening_balances.share_capital,
             'retained_earnings': model.opening_balances.retained_earnings,
         },
-        'paddocks': [{'name': p.name, 'property': p.property, 'size_ha': p.size_ha, 
-                      'can_rotate': p.can_rotate} for p in model.paddocks],
+        'paddocks': [{'name': p.name, 'property_name': p.property_name, 'size_ha': p.size_ha} 
+                     for p in model.paddocks],
         'fixed_assets': [{'name': a.name, 'asset_class': a.asset_class, 'asset_subclass': a.asset_subclass,
                           'purchase_date': a.purchase_date.isoformat(), 'purchase_amount': a.purchase_amount,
                           'useful_life_years': a.useful_life_years, 'residual_value': a.residual_value}
@@ -148,23 +148,12 @@ if 'model' not in st.session_state:
     st.session_state.calculated = False
 
 # Sidebar navigation
-st.sidebar.title("🚜 Farm Budget Builder")
+st.sidebar.title("🌾 FarmMate")
 st.sidebar.markdown("---")
 
-PAGES = {
-    "dashboard": "📊 Dashboard",
-    "setup": "⚙️ Setup",
-    "land_assets": "🚜 Land & Assets",
-    "cropping": "🌱 Cropping",
-    "livestock": "🐄🐑 Livestock",
-    "financials": "💰 Financials",
-    "reports": "📈 Reports",
-}
-
-page_key = st.sidebar.radio(
+page = st.sidebar.radio(
     "Navigate",
-    options=list(PAGES.keys()),
-    format_func=lambda k: PAGES[k],
+    ["📊 Dashboard", "⚙️ Setup", "🌾 Land & Assets", "🌱 Cropping", "🐄 Livestock", "💰 Financials", "📈 Reports"]
 )
 
 st.sidebar.markdown("---")
@@ -211,7 +200,7 @@ if uploaded_file is not None:
         st.sidebar.error(f"Load failed: {str(e)}")
 
 # Main content area
-if page_key == "dashboard":
+if page == "📊 Dashboard":
     st.markdown('<div class="main-header">Farm Dashboard</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Overview of your farm\'s financial performance</div>', unsafe_allow_html=True)
     
@@ -278,7 +267,7 @@ if page_key == "dashboard":
     else:
         st.info("👈 Complete the setup and click 'Recalculate' to see your dashboard")
 
-elif page_key == "setup":
+elif page == "⚙️ Setup":
     st.markdown('<div class="main-header">Farm Setup</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Configure your farm\'s basic details and assumptions</div>', unsafe_allow_html=True)
     
@@ -395,7 +384,7 @@ elif page_key == "setup":
         st.session_state.model.opening_balances.retained_earnings = retained
         
         # Balance check
-        total_assets = cash + debtors + inventory + fixed_assets + land
+        total_assets = cash + debtors + inventory + far_total + land
         total_liab_equity = creditors + debt + share_cap + retained
         
         st.markdown("---")
@@ -411,7 +400,7 @@ elif page_key == "setup":
             else:
                 st.error(f"⚠️ Out of balance by ${difference:,.2f}")
 
-elif page_key == "land_assets":
+elif page == "🌾 Land & Assets":
     st.markdown('<div class="main-header">Land & Assets</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Manage paddocks, rotations, and fixed assets</div>', unsafe_allow_html=True)
     
@@ -422,22 +411,19 @@ elif page_key == "land_assets":
         
         # Add paddock
         with st.expander("➕ Add Paddock"):
-            col1, col2, col3, col4 = st.columns(4)
+            col1, col2, col3 = st.columns(3)
             with col1:
                 pad_name = st.text_input("Paddock Name", key="pad_name")
             with col2:
                 pad_property = st.text_input("Property", key="pad_property")
             with col3:
                 pad_size = st.number_input("Size (ha)", min_value=0.0, key="pad_size")
-            with col4:
-                pad_rotate = st.checkbox("Can Rotate?", value=True, key="pad_rotate")
             
             if st.button("Add Paddock"):
                 new_pad = Paddock(
                     name=pad_name,
-                    property=pad_property,
-                    size_ha=pad_size,
-                    can_rotate=pad_rotate
+                    property_name=pad_property,
+                    size_ha=pad_size
                 )
                 st.session_state.model.paddocks.append(new_pad)
                 st.success(f"Added {pad_name}")
@@ -453,8 +439,8 @@ elif page_key == "land_assets":
                 
                 col1, col2, col3 = st.columns([6, 1, 1])
                 with col1:
-                    st.markdown(f"**{pad.name}** - {pad.property}")
-                    st.caption(f"Size: {pad.size_ha:,.1f} ha | Rotation: {'Yes' if pad.can_rotate else 'No'}")
+                    st.markdown(f"**{pad.name}** - {pad.property_name}")
+                    st.caption(f"Size: {pad.size_ha:,.1f} ha")
                 with col2:
                     if st.button("✏️", key=f"edit_pad_{idx}"):
                         st.session_state[f'editing_pad_{idx}'] = True
@@ -656,7 +642,7 @@ elif page_key == "land_assets":
         else:
             st.info("Add planned capital expenditure to model future purchases")
 
-elif page_key == "cropping":
+elif page == "🌱 Cropping":
     st.markdown('<div class="main-header">Cropping Enterprise</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Define your cropping program and margins</div>', unsafe_allow_html=True)
     
@@ -726,7 +712,7 @@ elif page_key == "cropping":
         with col3:
             st.metric("Total Crop Margin", f"${total_margin:,.0f}")
 
-elif page_key == "livestock":
+elif page == "🐄 Livestock":
     st.markdown('<div class="main-header">Livestock Enterprise</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Manage your beef and sheep operations</div>', unsafe_allow_html=True)
     
@@ -859,7 +845,7 @@ elif page_key == "livestock":
         else:
             st.info("Run calculation to see stock reconciliation")
 
-elif page_key == "financials":
+elif page == "💰 Financials":
     st.markdown('<div class="main-header">Financials</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Overheads and other financial items</div>', unsafe_allow_html=True)
     
@@ -920,7 +906,7 @@ elif page_key == "financials":
         df_oh = pd.DataFrame(oh_data)
         st.dataframe(df_oh, use_container_width=True)
 
-elif page_key == "reports":
+elif page == "📈 Reports":
     st.markdown('<div class="main-header">Reports</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">View detailed financial statements and reports</div>', unsafe_allow_html=True)
     
@@ -951,5 +937,5 @@ elif page_key == "reports":
 
 # Footer
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Farm Budget Builder v0.1 MVP**")
+st.sidebar.markdown("**FarmMate v0.1 MVP**")
 st.sidebar.markdown("Converted from Excel model")
