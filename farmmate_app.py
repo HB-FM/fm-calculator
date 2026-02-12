@@ -258,7 +258,7 @@ if page == "📊 Dashboard":
                     y=[annual['total_income'], -annual['total_direct_costs'], 
                        -annual['overheads'], -annual['depreciation'],
                        -annual['interest_expense'] + annual['interest_income'],
-                       -annual['tax'], 0],
+                       -annual['tax_expense'], 0],
                     measure=["relative", "relative", "relative", "relative", 
                             "relative", "relative", "total"]
                 ))
