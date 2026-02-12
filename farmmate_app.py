@@ -485,8 +485,6 @@ elif page == "🌾 Land & Assets":
                     useful_life_years=useful_life,
                     residual_value=residual
                 )
-                    residual_value=residual
-                )
                 st.session_state.model.fixed_assets.append(new_asset)
                 st.success(f"Added {asset_name}")
                 st.rerun()
