@@ -76,7 +76,7 @@ def model_to_dict(model):
         },
         'paddocks': [{'name': p.name, 'property_name': p.property_name, 'size_ha': p.size_ha} 
                      for p in model.paddocks],
-        'fixed_assets': [{'name': a.name, 'asset_class': a.asset_class, 'asset_subclass': a.asset_subclass,
+        'fixed_assets': [{'asset_name': a.asset_name, 'asset_class': a.asset_class, 'asset_subclass': a.asset_subclass,
                           'purchase_date': a.purchase_date.isoformat(), 'purchase_amount': a.purchase_amount,
                           'useful_life_years': a.useful_life_years, 'residual_value': a.residual_value}
                          for a in model.fixed_assets],
@@ -477,12 +477,14 @@ elif page == "🌾 Land & Assets":
             
             if st.button("Add Asset"):
                 new_asset = FixedAsset(
-                    name=asset_name,
+                    asset_name=asset_name,
                     asset_class=asset_class,
                     asset_subclass=asset_subclass,
                     purchase_date=datetime.combine(purchase_date, datetime.min.time()),
                     purchase_amount=purchase_amt,
                     useful_life_years=useful_life,
+                    residual_value=residual
+                )
                     residual_value=residual
                 )
                 st.session_state.model.fixed_assets.append(new_asset)
@@ -503,7 +505,7 @@ elif page == "🌾 Land & Assets":
                 
                 col1, col2, col3 = st.columns([6, 1, 1])
                 with col1:
-                    st.markdown(f"**{asset.name}** - {asset.asset_class} / {asset.asset_subclass}")
+                    st.markdown(f"**{asset.asset_name}** - {asset.asset_class} / {asset.asset_subclass}")
                     st.caption(f"Cost: ${asset.purchase_amount:,.0f} | Life: {asset.useful_life_years} yrs | Annual Dep: ${annual_dep:,.0f}")
                 with col2:
                     if st.button("✏️", key=f"edit_asset_{idx}"):
@@ -511,7 +513,7 @@ elif page == "🌾 Land & Assets":
                 with col3:
                     if st.button("🗑️", key=f"delete_asset_{idx}"):
                         st.session_state.model.fixed_assets.pop(idx)
-                        st.success(f"Deleted {asset.name}")
+                        st.success(f"Deleted {asset.asset_name}")
                         st.rerun()
                 
                 # Edit mode
@@ -520,7 +522,7 @@ elif page == "🌾 Land & Assets":
                         st.markdown("#### Edit Asset")
                         col1, col2 = st.columns(2)
                         with col1:
-                            new_name = st.text_input("Name", value=asset.name)
+                            new_name = st.text_input("Name", value=asset.asset_name)
                             new_class = st.selectbox("Class", 
                                 ["Buildings", "Irrigation", "Machinery", "Plant & Equipment", "Motor Vehicles", "Pasture"],
                                 index=["Buildings", "Irrigation", "Machinery", "Plant & Equipment", "Motor Vehicles", "Pasture"].index(asset.asset_class))
@@ -533,7 +535,7 @@ elif page == "🌾 Land & Assets":
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.form_submit_button("💾 Save"):
-                                asset.name = new_name
+                                asset.asset_name = new_name
                                 asset.asset_class = new_class
                                 asset.asset_subclass = new_subclass
                                 asset.purchase_amount = new_amount
