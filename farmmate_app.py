@@ -1,5 +1,5 @@
 """
-FarmMate - Farm Budgeting Web Application
+Farm Budgeting Web Application
 Streamlit interface for farm financial planning
 """
 
@@ -17,8 +17,8 @@ from farmmate_engine import (
 
 # Page config
 st.set_page_config(
-    page_title="FarmMate - Farm Budgeting Tool",
-    page_icon="🌾",
+    page_title="Farm Budget Builder",
+    page_icon="🚜",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -148,12 +148,23 @@ if 'model' not in st.session_state:
     st.session_state.calculated = False
 
 # Sidebar navigation
-st.sidebar.title("🌾 FarmMate")
+st.sidebar.title("🚜 Farm Budget Builder")
 st.sidebar.markdown("---")
 
-page = st.sidebar.radio(
+PAGES = {
+    "dashboard": "📊 Dashboard",
+    "setup": "⚙️ Setup",
+    "land_assets": "🚜 Land & Assets",
+    "cropping": "🌱 Cropping",
+    "livestock": "🐄🐑 Livestock",
+    "financials": "💰 Financials",
+    "reports": "📈 Reports",
+}
+
+page_key = st.sidebar.radio(
     "Navigate",
-    ["📊 Dashboard", "⚙️ Setup", "🌾 Land & Assets", "🌱 Cropping", "🐄 Livestock", "💰 Financials", "📈 Reports"]
+    options=list(PAGES.keys()),
+    format_func=lambda k: PAGES[k],
 )
 
 st.sidebar.markdown("---")
@@ -200,7 +211,7 @@ if uploaded_file is not None:
         st.sidebar.error(f"Load failed: {str(e)}")
 
 # Main content area
-if page == "📊 Dashboard":
+if page_key == "dashboard":
     st.markdown('<div class="main-header">Farm Dashboard</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Overview of your farm\'s financial performance</div>', unsafe_allow_html=True)
     
@@ -267,7 +278,7 @@ if page == "📊 Dashboard":
     else:
         st.info("👈 Complete the setup and click 'Recalculate' to see your dashboard")
 
-elif page == "⚙️ Setup":
+elif page_key == "setup":
     st.markdown('<div class="main-header">Farm Setup</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Configure your farm\'s basic details and assumptions</div>', unsafe_allow_html=True)
     
@@ -400,7 +411,7 @@ elif page == "⚙️ Setup":
             else:
                 st.error(f"⚠️ Out of balance by ${difference:,.2f}")
 
-elif page == "🌾 Land & Assets":
+elif page_key == "land_assets":
     st.markdown('<div class="main-header">Land & Assets</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Manage paddocks, rotations, and fixed assets</div>', unsafe_allow_html=True)
     
@@ -645,7 +656,7 @@ elif page == "🌾 Land & Assets":
         else:
             st.info("Add planned capital expenditure to model future purchases")
 
-elif page == "🌱 Cropping":
+elif page_key == "cropping":
     st.markdown('<div class="main-header">Cropping Enterprise</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Define your cropping program and margins</div>', unsafe_allow_html=True)
     
@@ -715,7 +726,7 @@ elif page == "🌱 Cropping":
         with col3:
             st.metric("Total Crop Margin", f"${total_margin:,.0f}")
 
-elif page == "🐄 Livestock":
+elif page_key == "livestock":
     st.markdown('<div class="main-header">Livestock Enterprise</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Manage your beef and sheep operations</div>', unsafe_allow_html=True)
     
@@ -848,7 +859,7 @@ elif page == "🐄 Livestock":
         else:
             st.info("Run calculation to see stock reconciliation")
 
-elif page == "💰 Financials":
+elif page_key == "financials":
     st.markdown('<div class="main-header">Financials</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Overheads and other financial items</div>', unsafe_allow_html=True)
     
@@ -909,7 +920,7 @@ elif page == "💰 Financials":
         df_oh = pd.DataFrame(oh_data)
         st.dataframe(df_oh, use_container_width=True)
 
-elif page == "📈 Reports":
+elif page_key == "reports":
     st.markdown('<div class="main-header">Reports</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">View detailed financial statements and reports</div>', unsafe_allow_html=True)
     
@@ -940,5 +951,5 @@ elif page == "📈 Reports":
 
 # Footer
 st.sidebar.markdown("---")
-st.sidebar.markdown("**FarmMate v0.1 MVP**")
+st.sidebar.markdown("**Farm Budget Builder v0.1 MVP**")
 st.sidebar.markdown("Converted from Excel model")
