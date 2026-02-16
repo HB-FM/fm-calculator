@@ -155,6 +155,7 @@ PAGES = {
     "dashboard": "📊 Dashboard",
     "setup": "⚙️ Setup",
     "land_assets": "🚜 Land & Assets",
+    "paddock_rotation": "🔄 Paddock Rotation",
     "cropping": "🌱 Cropping",
     "livestock": "🐄🐑 Livestock",
     "financials": "💰 Financials",
@@ -282,7 +283,7 @@ elif page_key == "setup":
     st.markdown('<div class="main-header">Farm Setup</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Configure your farm\'s basic details and assumptions</div>', unsafe_allow_html=True)
     
-    tab1, tab2, tab3, tab4 = st.tabs(["General", "Inflation", "Opening Balances", "Crop Types"])
+    tab1, tab2, tab3 = st.tabs(["General", "Inflation", "Opening Balances"])
     
     with tab1:
         st.subheader("Farm Details")
@@ -411,106 +412,12 @@ elif page_key == "setup":
             else:
                 st.error(f"⚠️ Out of balance by ${difference:,.2f}")
     
-    with tab4:
-        st.subheader("Crop Types & Programs")
-        st.markdown("Define your crop types and their standard input programs")
-        
-        # Initialize crop_programs in session state if not exists
-        if 'crop_programs' not in st.session_state:
-            st.session_state.crop_programs = []
-        
-        # Add crop type
-        with st.expander("➕ Add Crop Type"):
-            col1, col2 = st.columns(2)
-            with col1:
-                ct_name = st.text_input("Crop Type Name", placeholder="e.g., Wheat SFW1", key="new_ct_name")
-                ct_category = st.selectbox("Category", 
-                    ["Cereal", "Oilseed", "Pulse", "Cotton", "Hay/Silage", "Other"],
-                    key="new_ct_category")
-                ct_season = st.radio("Season", ["Winter", "Summer"], horizontal=True, key="new_ct_season")
-            
-            with col2:
-                ct_unit = st.selectbox("Yield Unit", 
-                    ["tonnes/ha", "bales/ha", "kg/ha"],
-                    key="new_ct_unit")
-                ct_default_yield = st.number_input("Typical Yield", min_value=0.0, key="new_ct_yield")
-                ct_default_price = st.number_input("Typical Price ($/unit)", min_value=0.0, key="new_ct_price")
-            
-            if st.button("Add Crop Type"):
-                new_type = {
-                    'name': ct_name,
-                    'category': ct_category,
-                    'season': ct_season,
-                    'unit': ct_unit,
-                    'default_yield': ct_default_yield,
-                    'default_price': ct_default_price,
-                    'inputs': []  # Will store input items
-                }
-                st.session_state.crop_programs.append(new_type)
-                st.success(f"Added {ct_name}")
-                st.rerun()
-        
-        # Display crop types
-        if st.session_state.crop_programs:
-            st.markdown("### Defined Crop Types")
-            
-            for idx, crop_type in enumerate(st.session_state.crop_programs):
-                with st.expander(f"🌾 {crop_type['name']} - {crop_type['season']} {crop_type['category']}", expanded=False):
-                    st.write(f"**Yield Unit:** {crop_type['unit']}")
-                    st.write(f"**Typical Yield:** {crop_type['default_yield']:.1f}")
-                    st.write(f"**Typical Price:** ${crop_type['default_price']:.2f}/{crop_type['unit'].split('/')[0]}")
-                    
-                    # Input program section
-                    st.markdown("#### Input Program")
-                    
-                    # Add input to this crop type
-                    with st.form(f"add_input_{idx}"):
-                        col1, col2, col3, col4 = st.columns(4)
-                        with col1:
-                            input_name = st.text_input("Input", placeholder="e.g., Urea", key=f"input_name_{idx}")
-                        with col2:
-                            input_rate = st.number_input("Rate", min_value=0.0, placeholder="kg/ha or L/ha", key=f"input_rate_{idx}")
-                        with col3:
-                            input_price = st.number_input("Price ($/unit)", min_value=0.0, key=f"input_price_{idx}")
-                        with col4:
-                            input_month = st.number_input("Month", min_value=1, max_value=12, key=f"input_month_{idx}")
-                        
-                        if st.form_submit_button("Add Input"):
-                            if 'inputs' not in crop_type:
-                                crop_type['inputs'] = []
-                            crop_type['inputs'].append({
-                                'name': input_name,
-                                'rate': input_rate,
-                                'price': input_price,
-                                'month': input_month,
-                                'cost_per_ha': input_rate * input_price
-                            })
-                            st.rerun()
-                    
-                    # Display inputs
-                    if crop_type.get('inputs'):
-                        st.markdown("**Inputs Defined:**")
-                        for input_item in crop_type['inputs']:
-                            st.write(f"- {input_item['name']}: {input_item['rate']} units × ${input_item['price']:.2f} = ${input_item['cost_per_ha']:.2f}/ha (Month {input_item['month']})")
-                        
-                        total_cost = sum(i['cost_per_ha'] for i in crop_type['inputs'])
-                        st.metric("Total Program Cost", f"${total_cost:.2f}/ha")
-                    else:
-                        st.info("No inputs defined yet. Add inputs above.")
-                    
-                    # Delete button
-                    if st.button("🗑️ Delete Crop Type", key=f"delete_ct_{idx}"):
-                        st.session_state.crop_programs.pop(idx)
-                        st.success(f"Deleted {crop_type['name']}")
-                        st.rerun()
-        else:
-            st.info("Add crop types to define standard programs that can be used when budgeting crops")
 
 elif page_key == "land_assets":
     st.markdown('<div class="main-header">Land & Assets</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Manage paddocks, rotations, and fixed assets</div>', unsafe_allow_html=True)
     
-    tab1, tab2, tab3 = st.tabs(["Paddocks & Rotation", "Fixed Assets", "CAPEX Planning"])
+    tab1, tab2, tab3 = st.tabs(["Paddocks", "Fixed Assets", "CAPEX Planning"])
     
     with tab1:
         st.subheader("Paddock Management")
@@ -776,166 +683,625 @@ elif page_key == "land_assets":
         else:
             st.info("Add planned capital expenditure to model future purchases")
 
+elif page_key == "paddock_rotation":
+    st.markdown('<div class="main-header">Paddock Rotation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">Plan which enterprises occupy each paddock throughout the year</div>', unsafe_allow_html=True)
+    
+    if not st.session_state.model.paddocks:
+        st.warning("⚠️ Add paddocks first in the 'Land & Assets' page")
+    else:
+        st.markdown("### Allocate Enterprises to Paddocks by Month")
+        st.caption("Plan which crop/pasture/livestock is in each paddock for each month of the budget")
+        
+        # Get options for dropdown
+        crop_options = ["Pasture", "Fallow"]
+        if st.session_state.model.crop_margins:
+            crop_options += [c.crop_name for c in st.session_state.model.crop_margins]
+        
+        # Display as a table for easier viewing
+        st.markdown("#### Rotation Planning")
+        
+        for paddock in st.session_state.model.paddocks:
+            with st.expander(f"🌾 {paddock.name} ({paddock.size_ha:.0f} ha) - {paddock.property_name}", expanded=False):
+                # Display in 2 rows of 6 months each
+                st.markdown("**Months 1-6:**")
+                cols = st.columns(6)
+                for month in range(1, 7):
+                    with cols[month - 1]:
+                        current = paddock.rotation.get(month, "Pasture")
+                        selection = st.selectbox(
+                            f"M{month}",
+                            options=crop_options,
+                            index=crop_options.index(current) if current in crop_options else 0,
+                            key=f"rotation_{paddock.name}_{month}",
+                            label_visibility="visible"
+                        )
+                        paddock.rotation[month] = selection
+                
+                st.markdown("**Months 7-12:**")
+                cols = st.columns(6)
+                for month in range(7, 13):
+                    with cols[month - 7]:
+                        current = paddock.rotation.get(month, "Pasture")
+                        selection = st.selectbox(
+                            f"M{month}",
+                            options=crop_options,
+                            index=crop_options.index(current) if current in crop_options else 0,
+                            key=f"rotation_{paddock.name}_{month}",
+                            label_visibility="visible"
+                        )
+                        paddock.rotation[month] = selection
+        
+        st.success("✅ Rotation changes saved automatically")
+
 elif page_key == "cropping":
     st.markdown('<div class="main-header">Cropping Enterprise</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Plan rotations, define programs, and calculate crop margins</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">Define crop types, build programs, and calculate margins</div>', unsafe_allow_html=True)
     
-    tab1, tab2, tab3 = st.tabs(["Crop Budgets", "Paddock Rotation", "Crop Programs"])
+    # Crop category icons
+    CROP_ICONS = {
+        "Cereal": "🌾",
+        "Oilseed": "🌻", 
+        "Pulse": "🫘",
+        "Cotton": "☁️",
+        "Hay/Silage": "🌿",
+        "Other": "🌱"
+    }
     
+    # Initialize crop_programs and crop_metadata in session state
+    if 'crop_programs' not in st.session_state:
+        st.session_state.crop_programs = []
+    if 'crop_metadata' not in st.session_state:
+        st.session_state.crop_metadata = {}
+    
+    tab1, tab2, tab3, tab4 = st.tabs(["Crop Types", "Crop Programs", "Crop Costs", "Crop Margins"])
+    
+    # ============================================================================
+    # TAB 1: CROP TYPES (moved from Setup)
+    # ============================================================================
     with tab1:
-        st.subheader("Crop Revenue & Margin Budgets")
+        st.subheader("Crop Type Library")
+        st.caption("Define standard crop types with typical yields, prices, and input programs")
         
-        # Add new crop
-        with st.expander("➕ Add New Crop"):
+        # Add new crop type
+        with st.expander("➕ Add New Crop Type"):
             col1, col2 = st.columns(2)
             with col1:
-                st.markdown("**Crop Details**")
-                crop_name = st.text_input("Crop Name", key="new_crop_name")
-                
-                # Crop type and unit selection
-                crop_type = st.selectbox("Crop Type", 
-                    ["Cereal (Wheat, Barley, Oats)", "Oilseed (Canola, Safflower)", "Pulse (Chickpeas, Lentils)", 
-                     "Cotton", "Hay/Silage", "Other"],
-                    key="new_crop_type")
-                
-                # Unit changes for cotton
-                if "Cotton" in crop_type:
-                    unit_label = "Yield (bales/ha)"
-                    price_label = "Price ($/bale)"
-                else:
-                    unit_label = "Yield (t/ha)"
-                    price_label = "Price ($/t)"
-                
-                # Season
-                season = st.radio("Season", ["Winter", "Summer"], horizontal=True, key="new_crop_season")
-                
-                area = st.number_input("Area (ha)", min_value=0.0, key="new_crop_area")
-                yield_val = st.number_input(unit_label, min_value=0.0, key="new_crop_yield")
-                
-            with col2:
-                st.markdown("**Revenue & Costs**")
-                price = st.number_input(price_label, min_value=0.0, key="new_crop_price")
-                deductions = st.number_input("Revenue Deductions (%)", min_value=0.0, max_value=100.0, 
-                                            value=5.0, key="new_crop_ded") / 100
-                
-                st.markdown("**Timing**")
-                harvest_month = st.number_input("Harvest Month", min_value=1, max_value=12, key="new_crop_harvest")
-                sale_month = st.number_input("Sale Month", min_value=1, max_value=12, key="new_crop_sale")
-                
-                st.markdown("**Costs**")
-                opening_cost = st.number_input("Opening WIP Cost ($/ha)", min_value=0.0, 
-                                              help="Costs already incurred for this crop (e.g., planted before budget period)",
-                                              key="new_crop_opening")
-                direct_cost = st.number_input("Growing Season Cost ($/ha)", min_value=0.0, key="new_crop_cost")
+                ct_name = st.text_input("Crop Name", placeholder="e.g., Wheat SFW1", key="new_ct_name")
+                ct_category = st.selectbox("Category", 
+                    list(CROP_ICONS.keys()),
+                    key="new_ct_category")
+                ct_season = st.radio("Season", ["Winter", "Summer"], horizontal=True, key="new_ct_season")
             
-            if st.button("Add Crop Budget"):
-                new_crop = CropMargin(
-                    crop_name=crop_name,
-                    area_ha=area,
-                    yield_per_ha=yield_val,
-                    price_per_unit=price,
-                    revenue_deductions_pct=deductions,
-                    harvest_month=harvest_month,
-                    sale_month=sale_month,
-                    direct_cost_per_ha=direct_cost + opening_cost  # Combine for now
-                )
-                # Add metadata for crop type and season (would need to enhance CropMargin dataclass)
-                st.session_state.model.crop_margins.append(new_crop)
-                st.success(f"Added {crop_name} ({season} {crop_type})")
+            with col2:
+                ct_unit = st.selectbox("Yield Unit", 
+                    ["tonnes/ha", "bales/ha", "kg/ha"],
+                    key="new_ct_unit")
+                ct_default_yield = st.number_input("Typical Yield", min_value=0.0, key="new_ct_yield")
+                ct_default_price = st.number_input("Typical Price ($/unit)", min_value=0.0, key="new_ct_price")
+            
+            if st.button("Add Crop Type"):
+                new_type = {
+                    'name': ct_name,
+                    'category': ct_category,
+                    'season': ct_season,
+                    'unit': ct_unit,
+                    'default_yield': ct_default_yield,
+                    'default_price': ct_default_price,
+                    'inputs': []  # Will store input items
+                }
+                st.session_state.crop_programs.append(new_type)
+                st.success(f"Added {ct_name}")
                 st.rerun()
         
-        # Display existing crops
+        # Display crop types
+        if st.session_state.crop_programs:
+            st.markdown("### Defined Crop Types")
+            
+            for idx, crop_type in enumerate(st.session_state.crop_programs):
+                icon = CROP_ICONS.get(crop_type['category'], '🌱')
+                with st.expander(f"{icon} {crop_type['name']} - {crop_type['season']} {crop_type['category']}", expanded=False):
+                    st.write(f"**Yield Unit:** {crop_type['unit']}")
+                    st.write(f"**Typical Yield:** {crop_type['default_yield']:.1f} {crop_type['unit']}")
+                    st.write(f"**Typical Price:** ${crop_type['default_price']:.2f}/{crop_type['unit'].split('/')[0]}")
+                    
+                    # Input program section
+                    st.markdown("#### Input Program Template")
+                    st.caption("Define typical inputs for this crop type (rates and prices can be adjusted per crop program)")
+                    
+                    # Add input to this crop type
+                    with st.form(f"add_input_{idx}"):
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            input_name = st.text_input("Input", placeholder="e.g., Urea", key=f"input_name_{idx}")
+                        with col2:
+                            input_unit = st.selectbox("Unit", ["kg", "L", "bag", "ha"], key=f"input_unit_{idx}")
+                        with col3:
+                            input_rate = st.number_input(f"Rate ({input_unit}/ha)", min_value=0.0, key=f"input_rate_{idx}")
+                        with col4:
+                            input_price = st.number_input(f"Price ($/{input_unit})", min_value=0.0, key=f"input_price_{idx}")
+                        
+                        if st.form_submit_button("Add Input"):
+                            if 'inputs' not in crop_type:
+                                crop_type['inputs'] = []
+                            crop_type['inputs'].append({
+                                'name': input_name,
+                                'unit': input_unit,
+                                'rate': input_rate,
+                                'price': input_price,
+                                'cost_per_ha': input_rate * input_price
+                            })
+                            st.rerun()
+                    
+                    # Display inputs
+                    if crop_type.get('inputs'):
+                        st.markdown("**Input Program:**")
+                        input_df_data = []
+                        for input_item in crop_type['inputs']:
+                            input_df_data.append({
+                                'Input': input_item['name'],
+                                'Rate': f"{input_item['rate']:.1f} {input_item['unit']}/ha",
+                                'Price': f"${input_item['price']:.2f}/{input_item['unit']}",
+                                'Cost/ha': f"${input_item['cost_per_ha']:.2f}"
+                            })
+                        
+                        if input_df_data:
+                            st.dataframe(input_df_data, use_container_width=True, hide_index=True)
+                        
+                        total_cost = sum(i['cost_per_ha'] for i in crop_type['inputs'])
+                        st.metric("Total Program Cost", f"${total_cost:.2f}/ha")
+                    else:
+                        st.info("No inputs defined yet. Add inputs above to create a standard program.")
+                    
+                    # Delete button
+                    col1, col2 = st.columns([1, 5])
+                    with col1:
+                        if st.button("🗑️ Delete", key=f"delete_ct_{idx}"):
+                            st.session_state.crop_programs.pop(idx)
+                            st.success(f"Deleted {crop_type['name']}")
+                            st.rerun()
+        else:
+            st.info("Add crop types to define standard programs that can be used when budgeting crops")
+    
+    # ============================================================================
+    # TAB 2: CROP PROGRAMS (like Excel 2.2 CROP PROGRAMS)
+    # ============================================================================
+    with tab2:
+        st.subheader("Crop Programs")
+        st.caption("Create specific crop budgets by selecting a crop type and defining area, paddocks, and input quantities")
+        
+        # Add new crop program
+        with st.expander("➕ Add New Crop Program"):
+            if not st.session_state.crop_programs:
+                st.warning("⚠️ Please define Crop Types first (in the Crop Types tab)")
+            else:
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.markdown("**Crop Details**")
+                    # Select crop type
+                    crop_type_names = [ct['name'] for ct in st.session_state.crop_programs]
+                    selected_type_name = st.selectbox("Select Crop Type", crop_type_names, key="prog_crop_type")
+                    
+                    # Get the selected crop type
+                    selected_type = next(ct for ct in st.session_state.crop_programs if ct['name'] == selected_type_name)
+                    
+                    prog_name = st.text_input("Program Name", value=selected_type_name, 
+                                             help="Give this program a unique name (e.g., 'Wheat North Paddocks')",
+                                             key="prog_name")
+                    prog_area = st.number_input("Area (ha)", min_value=0.0, key="prog_area")
+                    
+                    # Paddock selection
+                    if st.session_state.model.paddocks:
+                        paddock_names = [p.name for p in st.session_state.model.paddocks]
+                        prog_paddocks = st.multiselect("Paddocks", paddock_names, key="prog_paddocks")
+                    else:
+                        st.warning("⚠️ Add paddocks in Land & Assets to allocate them here")
+                        prog_paddocks = []
+                    
+                with col2:
+                    st.markdown("**Timing & Revenue**")
+                    prog_harvest = st.number_input("Harvest Month", min_value=1, max_value=12, 
+                                                   value=11, key="prog_harvest")
+                    prog_sale = st.number_input("Sale Month", min_value=1, max_value=12, 
+                                               value=12, key="prog_sale")
+                    
+                    prog_yield = st.number_input(f"Yield ({selected_type['unit']})", 
+                                                min_value=0.0, 
+                                                value=selected_type['default_yield'],
+                                                key="prog_yield")
+                    prog_price = st.number_input(f"Price ($/{selected_type['unit'].split('/')[0]})", 
+                                                min_value=0.0, 
+                                                value=selected_type['default_price'],
+                                                key="prog_price")
+                    prog_deductions = st.number_input("Revenue Deductions (%)", min_value=0.0, max_value=100.0, 
+                                                     value=5.0, key="prog_ded") / 100
+                
+                # Input quantities section
+                st.markdown("**Input Quantities**")
+                st.caption("Adjust the quantities from the crop type template as needed for this specific program")
+                
+                program_inputs = {}
+                if selected_type.get('inputs'):
+                    cols = st.columns(min(len(selected_type['inputs']), 4))
+                    for idx, input_item in enumerate(selected_type['inputs']):
+                        col_idx = idx % 4
+                        with cols[col_idx]:
+                            rate = st.number_input(
+                                f"{input_item['name']} ({input_item['unit']}/ha)",
+                                min_value=0.0,
+                                value=input_item['rate'],
+                                key=f"prog_input_{idx}_{input_item['name']}"
+                            )
+                            price = input_item['price']  # Use default price from type
+                            program_inputs[input_item['name']] = {
+                                'rate': rate,
+                                'unit': input_item['unit'],
+                                'price': price,
+                                'cost_per_ha': rate * price
+                            }
+                    
+                    # Show calculated program cost
+                    total_program_cost = sum(inp['cost_per_ha'] for inp in program_inputs.values())
+                    st.metric("Total Program Cost", f"${total_program_cost:.2f}/ha")
+                else:
+                    st.info("No inputs defined for this crop type. Add inputs in the Crop Types tab.")
+                    total_program_cost = 0.0
+                
+                if st.button("Add Crop Program"):
+                    # Create crop margin entry
+                    new_crop = CropMargin(
+                        crop_name=prog_name,
+                        area_ha=prog_area,
+                        yield_per_ha=prog_yield,
+                        price_per_unit=prog_price,
+                        revenue_deductions_pct=prog_deductions,
+                        harvest_month=int(prog_harvest),
+                        sale_month=int(prog_sale),
+                        direct_cost_per_ha=total_program_cost  # This is just program cost, opening WIP separate
+                    )
+                    st.session_state.model.crop_margins.append(new_crop)
+                    
+                    # Store metadata
+                    crop_id = len(st.session_state.model.crop_margins) - 1
+                    st.session_state.crop_metadata[crop_id] = {
+                        'crop_type': selected_type_name,
+                        'category': selected_type['category'],
+                        'season': selected_type['season'],
+                        'unit': selected_type['unit'],
+                        'paddocks': prog_paddocks,
+                        'program_inputs': program_inputs,
+                        'total_program_cost': total_program_cost,
+                        'opening_wip': 0.0  # Set separately in Crop Margins tab
+                    }
+                    
+                    st.success(f"Added crop program: {prog_name}")
+                    st.rerun()
+        
+        # Display existing crop programs
         if st.session_state.model.crop_margins:
-            st.markdown("### Crop Budgets")
+            st.markdown("### Active Crop Programs")
             
             for idx, crop in enumerate(st.session_state.model.crop_margins):
-                revenue = crop.calculate_revenue()
-                margin = crop.calculate_margin()
-                gm_per_ha = margin / crop.area_ha if crop.area_ha > 0 else 0
+                metadata = st.session_state.crop_metadata.get(idx, {})
+                icon = CROP_ICONS.get(metadata.get('category', 'Other'), '🌱')
                 
                 col1, col2, col3 = st.columns([6, 1, 1])
                 with col1:
-                    st.markdown(f"**{crop.crop_name}**")
-                    st.caption(f"Area: {crop.area_ha:,.0f} ha | Yield: {crop.yield_per_ha:,.1f} | Revenue: ${revenue:,.0f} | GM: ${margin:,.0f} (${gm_per_ha:,.0f}/ha)")
+                    st.markdown(f"{icon} **{crop.crop_name}**")
+                    paddocks_str = ", ".join(metadata.get('paddocks', [])) if metadata.get('paddocks') else "Not allocated"
+                    st.caption(f"Area: {crop.area_ha:,.0f} ha | Paddocks: {paddocks_str} | Program Cost: ${crop.direct_cost_per_ha:,.2f}/ha")
                 with col2:
-                    if st.button("✏️", key=f"edit_crop_{idx}"):
-                        st.session_state[f'editing_crop_{idx}'] = True
+                    if st.button("✏️", key=f"edit_prog_{idx}"):
+                        st.session_state[f'editing_prog_{idx}'] = True
                         st.rerun()
                 with col3:
-                    if st.button("🗑️", key=f"delete_crop_{idx}"):
+                    if st.button("🗑️", key=f"delete_prog_{idx}"):
                         st.session_state.model.crop_margins.pop(idx)
+                        if idx in st.session_state.crop_metadata:
+                            del st.session_state.crop_metadata[idx]
                         st.success(f"Deleted {crop.crop_name}")
                         st.rerun()
+                
+                # Show input breakdown
+                if metadata.get('program_inputs'):
+                    with st.expander(f"View Input Breakdown - {crop.crop_name}", expanded=False):
+                        input_data = []
+                        for input_name, input_details in metadata['program_inputs'].items():
+                            input_data.append({
+                                'Input': input_name,
+                                'Rate': f"{input_details['rate']:.1f} {input_details['unit']}/ha",
+                                'Price': f"${input_details['price']:.2f}/{input_details['unit']}",
+                                'Cost/ha': f"${input_details['cost_per_ha']:.2f}",
+                                'Total': f"${input_details['cost_per_ha'] * crop.area_ha:,.0f}"
+                            })
+                        st.dataframe(input_data, use_container_width=True, hide_index=True)
                 
                 st.markdown("---")
             
             # Summary
             total_area = sum(c.area_ha for c in st.session_state.model.crop_margins)
-            total_revenue = sum(c.calculate_revenue() for c in st.session_state.model.crop_margins)
-            total_margin = sum(c.calculate_margin() for c in st.session_state.model.crop_margins)
+            total_program_cost = sum(c.area_ha * c.direct_cost_per_ha for c in st.session_state.model.crop_margins)
             
-            col1, col2, col3 = st.columns(3)
+            col1, col2 = st.columns(2)
             with col1:
                 st.metric("Total Cropped Area", f"{total_area:,.0f} ha")
             with col2:
-                st.metric("Total Crop Revenue", f"${total_revenue:,.0f}")
-            with col3:
-                st.metric("Total Gross Margin", f"${total_margin:,.0f}")
+                st.metric("Total Program Costs", f"${total_program_cost:,.0f}")
         else:
-            st.info("Add your first crop to start building your cropping budget")
+            st.info("Add your first crop program to start budgeting")
     
-    with tab2:
-        st.subheader("Paddock Rotation Planning")
-        
-        if not st.session_state.model.paddocks:
-            st.warning("⚠️ Add paddocks first in the 'Land & Assets' page")
-        else:
-            st.markdown("### Allocate Crops to Paddocks by Month")
-            st.caption("Plan which crop/pasture is in each paddock for each month of the budget")
-            
-            # Create rotation table
-            if st.session_state.model.paddocks:
-                # Get crop names for dropdown
-                crop_options = ["Pasture", "Fallow"] + [c.crop_name for c in st.session_state.model.crop_margins]
-                
-                st.markdown("#### Rotation Planning Table")
-                st.caption("For each paddock, select what's growing in each month")
-                
-                for paddock in st.session_state.model.paddocks:
-                    with st.expander(f"🌾 {paddock.name} ({paddock.size_ha:.0f} ha)", expanded=False):
-                        cols = st.columns(6)
-                        
-                        for month in range(1, 13):
-                            col_idx = (month - 1) % 6
-                            with cols[col_idx]:
-                                # Get current rotation if exists
-                                current = paddock.rotation.get(month, "Pasture")
-                                
-                                selection = st.selectbox(
-                                    f"Month {month}",
-                                    options=crop_options,
-                                    index=crop_options.index(current) if current in crop_options else 0,
-                                    key=f"rotation_{paddock.name}_{month}"
-                                )
-                                
-                                # Update rotation
-                                paddock.rotation[month] = selection
-                
-                st.success("✅ Rotation saved automatically as you select")
-            
+    # ============================================================================
+    # TAB 3: CROP COSTS (like Excel 2.1 CROP_INPUTS)
+    # ============================================================================
     with tab3:
-        st.subheader("Detailed Crop Input Programs")
-        st.info("🚧 Crop Programs (detailed input scheduling) coming soon")
-        st.markdown("""
-        **This feature will include:**
-        - Activity-by-activity input scheduling (seeding, spraying, fertilising)
-        - Input library (seed, fertiliser, chemical types and rates)
-        - Cost per activity
-        - Timing by month
-        - Automatic cost calculation from programs
+        st.subheader("Crop Input Costs Breakdown")
+        st.caption("Detailed breakdown of inputs, rates, prices, and costs per crop")
         
-        **For now:** Use 'Direct Cost ($/ha)' in Crop Budgets tab
-        """)
+        if not st.session_state.model.crop_margins:
+            st.info("Add crop programs first to see cost breakdowns")
+        else:
+            # Select crop to view
+            crop_names = [c.crop_name for c in st.session_state.model.crop_margins]
+            selected_crop_name = st.selectbox("Select Crop", crop_names, key="costs_crop_select")
+            
+            # Find the crop
+            crop_idx = next(idx for idx, c in enumerate(st.session_state.model.crop_margins) 
+                           if c.crop_name == selected_crop_name)
+            crop = st.session_state.model.crop_margins[crop_idx]
+            metadata = st.session_state.crop_metadata.get(crop_idx, {})
+            
+            # Display crop summary
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Crop", crop.crop_name)
+                st.metric("Area", f"{crop.area_ha:,.0f} ha")
+            with col2:
+                st.metric("Program Cost/ha", f"${crop.direct_cost_per_ha:,.2f}")
+                st.metric("Total Program Cost", f"${crop.area_ha * crop.direct_cost_per_ha:,.0f}")
+            with col3:
+                st.metric("Category", metadata.get('category', 'N/A'))
+                st.metric("Season", metadata.get('season', 'N/A'))
+            
+            st.markdown("---")
+            
+            # Input breakdown table
+            if metadata.get('program_inputs'):
+                st.markdown("### Input Item Breakdown")
+                
+                input_breakdown = []
+                for input_name, input_details in metadata['program_inputs'].items():
+                    cost_per_ha = input_details['cost_per_ha']
+                    total_cost = cost_per_ha * crop.area_ha
+                    
+                    input_breakdown.append({
+                        'Input': input_name,
+                        'Rate': f"{input_details['rate']:.1f}",
+                        'Unit': input_details['unit'],
+                        'Price': f"${input_details['price']:.2f}",
+                        'Cost/ha': f"${cost_per_ha:.2f}",
+                        'Total Cost': f"${total_cost:,.0f}"
+                    })
+                
+                # Display as dataframe
+                st.dataframe(input_breakdown, use_container_width=True, hide_index=True, height=400)
+                
+                # Totals
+                st.markdown("---")
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Total Cost/ha", f"${crop.direct_cost_per_ha:,.2f}")
+                with col2:
+                    st.metric("Total Program Cost", f"${crop.area_ha * crop.direct_cost_per_ha:,.0f}")
+                with col3:
+                    num_inputs = len(metadata['program_inputs'])
+                    st.metric("Number of Inputs", num_inputs)
+            else:
+                st.info("No input breakdown available for this crop. Add inputs when creating crop programs.")
+    
+    # ============================================================================
+    # TAB 4: CROP MARGINS (like Excel 2.3 CROP MARGINS)
+    # ============================================================================
+    with tab4:
+        st.subheader("Crop Margins & Revenue")
+        st.caption("Calculate gross margin with revenue and all costs including opening WIP")
+        
+        if not st.session_state.model.crop_margins:
+            st.info("Add crop programs first to calculate margins")
+        else:
+            # Select crop to view
+            crop_names = [c.crop_name for c in st.session_state.model.crop_margins]
+            selected_crop_name = st.selectbox("Select Crop", crop_names, key="margin_crop_select")
+            
+            # Find the crop
+            crop_idx = next(idx for idx, c in enumerate(st.session_state.model.crop_margins) 
+                           if c.crop_name == selected_crop_name)
+            crop = st.session_state.model.crop_margins[crop_idx]
+            metadata = st.session_state.crop_metadata.get(crop_idx, {})
+            
+            # Crop header
+            icon = CROP_ICONS.get(metadata.get('category', 'Other'), '🌱')
+            st.markdown(f"## {icon} {crop.crop_name}")
+            
+            col1, col2 = st.columns(2)
+            
+            # ===== LEFT COLUMN: REVENUE =====
+            with col1:
+                st.markdown("### 📈 REVENUE")
+                
+                # Editable yield and price
+                with st.form(f"revenue_form_{crop_idx}"):
+                    new_yield = st.number_input("Yield (per ha)", value=crop.yield_per_ha, min_value=0.0)
+                    new_price = st.number_input("Price ($/unit)", value=crop.price_per_unit, min_value=0.0)
+                    new_deductions = st.number_input("Deductions (%)", value=crop.revenue_deductions_pct * 100, 
+                                                    min_value=0.0, max_value=100.0)
+                    
+                    if st.form_submit_button("Update Revenue"):
+                        crop.yield_per_ha = new_yield
+                        crop.price_per_unit = new_price
+                        crop.revenue_deductions_pct = new_deductions / 100
+                        st.rerun()
+                
+                # Calculate revenue
+                total_production = crop.area_ha * crop.yield_per_ha
+                gross_revenue = total_production * crop.price_per_unit
+                deductions_amount = gross_revenue * crop.revenue_deductions_pct
+                net_revenue = gross_revenue - deductions_amount
+                
+                st.markdown("**Revenue Calculation:**")
+                st.write(f"Yield: {crop.yield_per_ha:.2f} × {crop.area_ha:.0f} ha = **{total_production:.0f} units**")
+                st.write(f"Price: ${crop.price_per_unit:.2f}/unit")
+                st.metric("Gross Revenue", f"${gross_revenue:,.0f}")
+                st.write(f"Deductions ({crop.revenue_deductions_pct*100:.1f}%): -${deductions_amount:,.0f}")
+                st.metric("Net Revenue", f"${net_revenue:,.0f}", delta=None)
+            
+            # ===== RIGHT COLUMN: COSTS =====
+            with col2:
+                st.markdown("### 💰 COSTS")
+                
+                # Opening WIP cost (editable)
+                opening_wip = metadata.get('opening_wip', 0.0)
+                
+                with st.form(f"cost_form_{crop_idx}"):
+                    new_opening_wip = st.number_input("Opening WIP Cost ($/ha)", value=opening_wip, min_value=0.0,
+                                                     help="Costs incurred before budget period (e.g., planted last year)")
+                    
+                    if st.form_submit_button("Update Opening WIP"):
+                        metadata['opening_wip'] = new_opening_wip
+                        st.session_state.crop_metadata[crop_idx] = metadata
+                        # Update total cost
+                        crop.direct_cost_per_ha = metadata['total_program_cost'] + new_opening_wip
+                        st.rerun()
+                
+                # Cost breakdown
+                opening_wip_total = opening_wip * crop.area_ha
+                program_cost_per_ha = metadata.get('total_program_cost', crop.direct_cost_per_ha)
+                program_cost_total = program_cost_per_ha * crop.area_ha
+                total_cost_per_ha = opening_wip + program_cost_per_ha
+                total_costs = opening_wip_total + program_cost_total
+                
+                st.markdown("**Cost Breakdown:**")
+                st.write(f"Opening WIP: ${opening_wip:.2f}/ha × {crop.area_ha:.0f} ha = **${opening_wip_total:,.0f}**")
+                st.write(f"Program Cost: ${program_cost_per_ha:.2f}/ha × {crop.area_ha:.0f} ha = **${program_cost_total:,.0f}**")
+                st.metric("Total Costs", f"${total_costs:,.0f}")
+                st.metric("Total Cost/ha", f"${total_cost_per_ha:.2f}")
+            
+            # ===== MARGIN CALCULATION =====
+            st.markdown("---")
+            st.markdown("### 🎯 GROSS MARGIN")
+            
+            gross_margin = net_revenue - total_costs
+            gm_per_ha = gross_margin / crop.area_ha if crop.area_ha > 0 else 0
+            roc = (gross_margin / total_costs * 100) if total_costs > 0 else 0
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Gross Margin", f"${gross_margin:,.0f}")
+            with col2:
+                st.metric("GM per ha", f"${gm_per_ha:,.0f}")
+            with col3:
+                st.metric("ROC", f"{roc:.1f}%")
+            with col4:
+                st.metric("Area", f"{crop.area_ha:,.0f} ha")
+            
+            # Summary table
+            st.markdown("---")
+            st.markdown("### 📊 Summary")
+            
+            summary_data = [
+                {"Item": "Net Revenue", "Per Ha": f"${net_revenue/crop.area_ha:,.2f}", "Total": f"${net_revenue:,.0f}"},
+                {"Item": "Opening WIP", "Per Ha": f"${opening_wip:,.2f}", "Total": f"${opening_wip_total:,.0f}"},
+                {"Item": "Program Costs", "Per Ha": f"${program_cost_per_ha:,.2f}", "Total": f"${program_cost_total:,.0f}"},
+                {"Item": "Total Costs", "Per Ha": f"${total_cost_per_ha:,.2f}", "Total": f"${total_costs:,.0f}"},
+                {"Item": "Gross Margin", "Per Ha": f"${gm_per_ha:,.2f}", "Total": f"${gross_margin:,.0f}"},
+            ]
+            
+            st.dataframe(summary_data, use_container_width=True, hide_index=True)
+            
+            # Overall summary for all crops
+            st.markdown("---")
+            st.markdown("### 🌾 All Crops Summary")
+            
+            all_crops_data = []
+            total_all_area = 0
+            total_all_revenue = 0
+            total_all_costs = 0
+            total_all_margin = 0
+            
+            for idx, c in enumerate(st.session_state.model.crop_margins):
+                meta = st.session_state.crop_metadata.get(idx, {})
+                icon = CROP_ICONS.get(meta.get('category', 'Other'), '🌱')
+                
+                c_revenue = c.calculate_revenue()
+                c_opening = meta.get('opening_wip', 0.0) * c.area_ha
+                c_program = meta.get('total_program_cost', c.direct_cost_per_ha) * c.area_ha
+                c_total_cost = c_opening + c_program
+                c_margin = c_revenue - c_total_cost
+                c_gm_per_ha = c_margin / c.area_ha if c.area_ha > 0 else 0
+                
+                all_crops_data.append({
+                    "Crop": f"{icon} {c.crop_name}",
+                    "Area": f"{c.area_ha:,.0f}",
+                    "Revenue": f"${c_revenue:,.0f}",
+                    "Costs": f"${c_total_cost:,.0f}",
+                    "GM": f"${c_margin:,.0f}",
+                    "GM/ha": f"${c_gm_per_ha:,.0f}"
+                })
+                
+                total_all_area += c.area_ha
+                total_all_revenue += c_revenue
+                total_all_costs += c_total_cost
+                total_all_margin += c_margin
+            
+            st.dataframe(all_crops_data, use_container_width=True, hide_index=True)
+            
+            # Grand totals
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Cropped Area", f"{total_all_area:,.0f} ha")
+            with col2:
+                st.metric("Total Revenue", f"${total_all_revenue:,.0f}")
+            with col3:
+                st.metric("Total Costs", f"${total_all_costs:,.0f}")
+            with col4:
+                st.metric("Total GM", f"${total_all_margin:,.0f}")
+
+elif page_key == "paddock_rotation":
+    st.markdown('<div class="main-header">Paddock Rotation</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">Plan which crops/enterprises are in each paddock by month</div>', unsafe_allow_html=True)
+    
+    if not st.session_state.model.paddocks:
+        st.warning("⚠️ Add paddocks first in the 'Land & Assets' page")
+    else:
+        st.markdown("### Allocate Crops to Paddocks by Month")
+        st.caption("Plan which crop/pasture is in each paddock for each month of the budget")
+        
+        # Get crop names for dropdown
+        crop_options = ["Pasture", "Fallow"] + [c.crop_name for c in st.session_state.model.crop_margins]
+        
+        st.markdown("#### Rotation Planning Table")
+        st.caption("For each paddock, select what's growing in each month")
+        
+        for paddock in st.session_state.model.paddocks:
+            with st.expander(f"🌾 {paddock.name} ({paddock.size_ha:.0f} ha)", expanded=False):
+                cols = st.columns(6)
+                
+                for month in range(1, 13):
+                    col_idx = (month - 1) % 6
+                    with cols[col_idx]:
+                        # Get current rotation if exists
+                        current = paddock.rotation.get(month, "Pasture")
+                        
+                        selection = st.selectbox(
+                            f"Month {month}",
+                            options=crop_options,
+                            index=crop_options.index(current) if current in crop_options else 0,
+                            key=f"rotation_{paddock.name}_{month}"
+                        )
+                        
+                        # Update rotation
+                        paddock.rotation[month] = selection
+        
+        st.success("✅ Rotation saved automatically as you select")
 
 elif page_key == "livestock":
     st.markdown('<div class="main-header">Livestock Enterprise</div>', unsafe_allow_html=True)
